@@ -33,6 +33,13 @@ CXX="$(which %{cms_cxx}) -fPIC"
 CC="$(which gcc) -fPIC"
 PLATF_CONF_OPTS="--enable-shared --disable-static"
 
+echo "LD_LIBRARY_PATH"
+echo $LD_LIBRARY_PATH
+
+export LD_LIBRARY_PATH=$LHAPDF_DATA_PATH:$LHAPDF_ROOT/lib:$LD_LIBRARY_PATH
+echo $LD_LIBRARY_PATH
+
+
 
 ./configure $PLATF_CONF_OPTS \
             --with-lhapdf=$LHAPDF_ROOT \
@@ -45,6 +52,16 @@ PLATF_CONF_OPTS="--enable-shared --disable-static"
             --without-javagui \
             --prefix=%{i} \
             --disable-readline CXX="$CXX" CC="$CC"  
+
+
+# Debug output
+echo "LHAPDF_DATA_PATH"
+echo
+echo $LHAPDF_DATA_PATH 
+echo
+echo `which lhapdf`
+echo
+echo `lhapdf list --installed`
 
 make %{makeprocesses}
 
