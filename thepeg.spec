@@ -14,6 +14,7 @@ Requires: rivet
 
 
 BuildRequires: autotools
+BuildRequires: lhapdf
 
 %define keep_archives true
 

@@ -16,6 +16,7 @@ Requires: madgraph5amcatnlo
 Requires: openloops
 
 Patch0: herwigpp-missingBoostMTLib
+Patch1: herwigpp-defaultsRpo
 
 BuildRequires: autotools
 BuildRequires: lhapdf
@@ -30,6 +31,7 @@ BuildRequires: lhapdf
 %setup -q -n Herwig-%{realversion}
 
 %patch0 -p1 
+%patch1 -p1
 
 # Regenerate build scripts
 autoreconf -fiv
