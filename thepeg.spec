@@ -1,101 +1,62 @@
-### RPM external thepeg 1.7.0
-## INITENV +PATH LD_LIBRARY_PATH %i/lib/ThePEG
-## INITENV +PATH DYLD_LIBRARY_PATH %i/lib/ThePEG
-#Source: http://www.thep.lu.se/~leif/ThePEG/ThePEG-%{realversion}.tgz
-#Source: http://projects.hepforge.org/herwig/files/ThePEG-%{realversion}.tar.gz
-Source: http://service-spi.web.cern.ch/service-spi/external/MCGenerators/distribution/%{n}/%{n}-%{realversion}-src.tgz
-Patch0: thepeg-1.7.0-break-termcap-dependence
-Patch1: thepeg-1.7.0-use-dylibs-macosx
-Patch2: thepeg-1.6.1-lhapdf-env
-Patch3: thepeg-1.6.1-gcc46
-Patch4: thepeg-1.7.0-configure
-Patch5: thepeg-1.7.0-gcc46
-Patch6: thepeg-1.7.0-fix-bogus-ZLIB-HOME
-Patch7: thepeg-1.7.0-fix-gcc47-cxx11
-Patch8: thepeg-1.7.0-zlib-void-to-gzFile-ptr
+### RPM external thepeg 2.0.2
+## INITENV +PATH LD_LIBRARY_PATH %{i}/lib/ThePEG
+## INITENV +PATH DYLD_LIBRARY_PATH %{i}/lib/ThePEG
+
+# Download from official webpage
+Source: http://www.hepforge.org/archive/thepeg/ThePEG-%{realversion}.tar.bz2
+
 Requires: lhapdf
 Requires: gsl
 Requires: hepmc
 Requires: zlib
-# FIXME: rivet?
+Requires: fastjet
+Requires: rivet
+
+
+BuildRequires: autotools
+BuildRequires: lhapdf
+
 %define keep_archives true
-%if "%(case %cmsplatf in (osx*_*_gcc421) echo true ;; (*) echo false ;; esac)" == "true"
-Requires: gfortran-macosx
-%endif
 
 %if "%{?cms_cxx:set}" != "set"
 %define cms_cxx c++
 %endif
 
-%if "%{?cms_cxxflags:set}" != "set"
-%define cms_cxxflags -O2 -std=c++0x
-%endif
 
 %prep
-%setup -q -n %{n}/%{realversion}
-%patch0 -p2
-case %cmsos in 
-  osx*)
-%patch1 -p1
-  ;;
-esac
-%patch2 -p2
-%patch3 -p2
-%patch4 -p1
-%patch5 -p1
-%patch6 -p2
-%patch7 -p1
-%patch8 -p2
+%setup -q -n ThePEG-%{realversion}
 
-# Trick make not to re-run aclocal, autoconf, automake, autoscan, etc.
-find . -exec touch -m -t 201201010000 {} \;
+# Regenerate build scripts
+autoreconf -fiv
 
 %build
-# Build as static only on new architectures.
-case %cmsplatf in 
-  slc5*_*_gcc4[01234]*) 
-    CXX="`which %cms_cxx`"
-    CC="`which gcc`"    
-    PLATF_CONF_OPTS="--enable-shared --disable-static"
-    LIBGFORTRAN=`gfortran --print-file-name=libgfortran.so` 
-  ;;
-  *) perl -p -i -e 's|libLHAPDF[.]so|libLHAPDF.a|g' configure 
-    CXX="`which %cms_cxx` -fPIC"
-    CC="`which gcc` -fPIC"
-    PLATF_CONF_OPTS="--enable-shared --disable-static"
-    LIBGFORTRAN="`gfortran --print-file-name=libgfortran.so`"
-  ;;
-esac
+CXX="$(which %{cms_cxx}) -fPIC"
+CC="$(which gcc) -fPIC"
+PLATF_CONF_OPTS="--enable-shared --disable-static"
 
-case %cmsplatf in
-  osx*) LIBGFORTRAN="`gfortran --print-file-name=libgfortran.a`" ;;
-esac
-
-case %cmsplatf in
-  osx*_*_gcc4[0-5]*) ;;
-  osx*_*_gcc*) LIBQUADMATH="-lquadmath" ;;
-esac
 
 ./configure $PLATF_CONF_OPTS \
-            --disable-silent-rules \
-            --with-LHAPDF=$LHAPDF_ROOT \
+            --with-lhapdf=$LHAPDF_ROOT \
+            --with-boost=$BOOST_ROOT \
             --with-hepmc=$HEPMC_ROOT \
-            --with-gsl=$GSL_ROOT --with-zlib=$ZLIB_ROOT \
-            --without-javagui --prefix=%i \
-            --disable-readline CXX="$CXX" CC="$CC" CXXFLAGS="%cms_cxxflags" \
-            LIBS="-L$LHAPDF_ROOT/lib -lLHAPDF $LIBGFORTRAN -lz $LIBQUADMATH"
-make
+            --with-gsl=$GSL_ROOT \
+            --with-zlib=$ZLIB_ROOT \
+            --with-fastjet=$FASTJET_ROOT \
+            --with-rivet=$RIVET_ROOT \
+            --without-javagui \
+            --prefix=%{i} \
+            --disable-readline CXX="$CXX" CC="$CC"  
+
+
+
+make %{makeprocesses}
 
 %install
-
 make install
-rm %i/share/ThePEG/Doc/fixinterfaces.pl
-cd %i/lib/ThePEG
-for item in LesHouches.so ; do
-  [ -e lib$item ] || ln -s $item lib$item
-done
-find %i/lib -name '*.la' -exec rm -f {} \;
+find %{i}/lib -name '*.la' -exec rm -f {} \;
 
 %post
 %{relocateConfig}lib/ThePEG/Makefile.common
-%{relocateConfig}lib/ThePEG/libtool
+%{relocateConfig}lib/ThePEG/Makefile
+%{relocateConfig}lib/ThePEG/ThePEGDefaults.rpo
+%{relocateConfig}lib/ThePEG/ThePEGDefaults-%{realversion}.rpo

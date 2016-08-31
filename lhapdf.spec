@@ -1,19 +1,21 @@
-### RPM external lhapdf 5.8.5
+### RPM external lhapdf 6.1.6
+%define setsversion 6.1.6
 
-%define realversion %(echo %{v} | cut -d- -f1)
 Source: http://cern.ch/service-spi/external/MCGenerators/distribution/%{n}/%{n}-%{realversion}-src.tgz
-Patch1: lhapdf-5.8.5-gzio
-Patch2: lhapdf-data-5.8.5-gzio
-Patch3: lhapdf-5.8.5-disable-examples-and-tests
 
-Requires: zlib python
-BuildRequires: autotools swig
+Source1: lhapdf_makeLinks
+
+Source2: http://www.hepforge.org/archive/lhapdf/pdfsets/6.1/cteq6l1.tar.gz
+Source3: http://www.hepforge.org/archive/lhapdf/pdfsets/6.1/CT10.tar.gz
+Source4: http://www.hepforge.org/archive/lhapdf/pdfsets/6.1/MSTW2008nlo68cl.tar.gz
+Source5: https://www.hepforge.org/archive/lhapdf/pdfsets/6.1/MMHT2014lo68cl.tar.gz
+Source6: https://www.hepforge.org/archive/lhapdf/pdfsets/6.1/MMHT2014nlo68cl.tar.gz
+
+Source7: lhapdf_pdfsetsindex
+
+Requires: boost yaml-cpp python cython
 
 %define keep_archives true
-%if "%(case %{cmsplatf} in (osx*_*_gcc421) echo true ;; (*) echo false ;; esac)" == "true"
-Requires: gfortran-macosx
-%endif
-
 
 %if "%{?cms_cxx:set}" != "set"
 %define cms_cxx c++
@@ -25,74 +27,40 @@ Requires: gfortran-macosx
 
 %prep
 %setup -q -n %{n}/%{realversion}
-%patch3 -p2
 
-touch src/gzio.inc ; touch src/gzio.F ; touch src/ftn_gzio.c 
-
-# Remove wrapper generated w/ SWIG 1.3* version. Makefile will
-# regenerate it w/ our SWIG version.
-rm ./pyext/lhapdf_wrap.cc
-
-%patch1 -p2
-
-cd share/lhapdf/PDFsets
-%patch2 -p5
-
-rm -f *gz NNPDF*1000*
-cat <<\EOF > ../compress.mk
-FILES=$(addsuffix .gz,$(wildcard *))
-all: ${FILES}
-%.gz: %
-	gzip -9 $<
-EOF
-
-make -j %{makeprocesses} -f ../compress.mk all
+./configure --prefix=%{i} --with-boost=${BOOST_ROOT} --with-yaml-cpp=${YAML-CPP_ROOT} PYTHON=${PYTHON_ROOT}/bin/python CYTHON=${CYTHON_ROOT}/bin/cython PYTHONPATH=${CYTHON_ROOT}/lib/python@PYTHONV@/site-packages
 
 %build
-# We do everything in install because we need to do it twice.
+make all %makeprocesses PYTHONPATH=${CYTHON_ROOT}/lib/python@PYTHONV@/site-packages
+
 %install
-libtoolize --force --copy
-autoupdate
-aclocal -I m4
-autoconf
-automake --add-missing
-
-FC="`which gfortran` -fPIC"
-CXX="`which %{cms_cxx}` -fPIC"
-CC="`which gcc` -fPIC"
-
-# Configure first with low memory.
-./configure --prefix=%{i} --enable-static --disable-shared --enable-pyext \
-            --disable-octave --disable-doxygen --enable-low-memory \
-            --with-max-num-pdfsets=1 \
-            FC="$FC" CXX="$CXX" CC="$CC" \
-            CPPFLAGS="-I ${ZLIB_ROOT}/include" CXXFLAGS="%cms_cxxflags" LDFLAGS="-L${ZLIB_ROOT}/lib -lz"
-make %{makeprocesses}
-make install
-
-mkdir %{i}/share/lhapdf/PDFsets
-mv share/lhapdf/PDFsets/*gz %{i}/share/lhapdf/PDFsets
-pushd %{i}/share/lhapdf/PDFsets
-  for x in `ls *.gz`; do
-    ln -sf $x `echo $x | sed -e's|\.gz$||'`
-  done
-popd
-
-# do another install-round for full libs
-make distclean
-./configure --prefix=%{i}/full --enable-static --disable-shared \
-            --enable-pyext --disable-octave --disable-doxygen \
-            FC="$FC" CXX="$CXX" CC="$CC" \
-            CPPFLAGS="-I ${ZLIB_ROOT}/include" CXXFLAGS="%cms_cxxflags" LDFLAGS="-L${ZLIB_ROOT}/lib -lz"
-make %{makeprocesses}
-make install
+make install PYTHONPATH=${CYTHON_ROOT}/lib/python@PYTHONV@/site-packages
+mkdir -p %{i}/share/LHAPDF
+cd %{i}/share/LHAPDF
+cp %{_sourcedir}/cteq6l1.tar.gz .
+cp %{_sourcedir}/CT10.tar.gz .
+cp %{_sourcedir}/MSTW2008nlo68cl.tar.gz .
+cp %{_sourcedir}/MMHT2014lo68cl.tar.gz .
+cp %{_sourcedir}/MMHT2014nlo68cl.tar.gz .
+tar xvfz cteq6l1.tar.gz
+tar xvfz CT10.tar.gz
+tar xvfz MSTW2008nlo68cl.tar.gz
+tar xvfz MMHT2014lo68cl.tar.gz
+tar xvfz MMHT2014nlo68cl.tar.gz
+rm -f cteq6l1.tar.gz
+rm -f CT10.tar.gz
+rm -f MSTW2008nlo68cl.tar.gz
+rm -f MMHT2014lo68cl.tar.gz
+rm -f MMHT2014nlo68cl.tar.gz
+chmod a+x %{_sourcedir}/lhapdf_makeLinks
+%{_sourcedir}/lhapdf_makeLinks %{setsversion}
+rm -f pdfsets.index
+cp -f %{_sourcedir}/lhapdf_pdfsetsindex pdfsets.index
+cd -
 
 # Remove all libtool archives
 find %{i} -name '*.la' -exec rm -f {} \;
 
-# Remove egg-info
-find %{i} -name '*.egg-info' -delete
-
 %post
 %{relocateConfig}bin/lhapdf-config
-%{relocateConfig}full/bin/lhapdf-config
+%{relocateConfig}bin/lhapdf
